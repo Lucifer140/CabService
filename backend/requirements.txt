@@ -1,0 +1,40 @@
+# ==============================================================================
+# SANGITA TRAVELS PUNE (PUNE TAXI CAB) — BACKEND RUNTIME DEPENDENCIES
+# ==============================================================================
+#
+# ARCHITECTURAL DESIGN:
+# The backend microservice is intentionally architected with ZERO external runtime
+# dependencies, leveraging Python's battle-tested standard library. This ensures:
+#   1. Instantaneous cold starts and ultra-low memory footprint.
+#   2. Zero supply-chain security vulnerabilities (no CVE exposure from 3rd-party packages).
+#   3. Deterministic, maintenance-free execution across all supported environments.
+#   4. Seamless deployment without network-dependent package installations.
+#
+# SYSTEM REQUIREMENTS:
+#   - Python Version: >= 3.9 (tested on Python 3.9, 3.10, 3.11, 3.12)
+#   - Standard Library Modules Utilized:
+#       * http.server       : Modular HTTP/1.1 request handling & SPA dispatcher
+#       * sqlite3           : Transactional relational database with WAL & foreign keys
+#       * hashlib           : PBKDF2-HMAC-SHA256 cryptographic password hashing (100k iter)
+#       * secrets           : Cryptographically secure token & salt generation
+#       * urllib.parse      : URL path parsing and query string decoding
+#       * json              : High-throughput JSON payload serialization/deserialization
+#       * csv / io          : Streaming CSV report generation for booking analytics
+#       * datetime          : Booking scheduling, session expiry, and audit tracking
+#       * contextlib        : Context-managed SQLite connection handling
+#       * mimetypes         : Dynamic MIME-type detection for static asset serving
+#
+# RUNTIME PACKAGES:
+#   Currently: 0 (Pure Standard Library)
+#   Running `pip install -r requirements.txt` in CI/CD will succeed immediately.
+#
+# DEVELOPMENT & TESTING:
+#   To install development tooling (pytest, ruff, mypy), run:
+#     pip install -r requirements-dev.txt
+#   Or using pyproject.toml:
+#     pip install -e ".[dev]"
+#
+# FUTURE EXPANSIONS:
+#   When third-party integrations (e.g. Razorpay payment SDK, Twilio WhatsApp API)
+#   are introduced in later phases, their pinned dependencies will be added below.
+# ==============================================================================

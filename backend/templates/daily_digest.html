@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Daily Bookings Digest - {{business_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .header { background: #0f172a; padding: 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .content { padding: 24px; }
+    .metrics { display: flex; justify-content: space-around; margin: 20px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; text-align: center; }
+    .metric-val { font-size: 24px; font-weight: 800; color: #2563eb; }
+    .metric-lbl { font-size: 12px; color: #64748b; text-transform: uppercase; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+    th { background: #f1f5f9; padding: 10px; text-align: left; font-weight: 600; color: #475569; }
+    td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+    .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    .status-NEW { background: #fef3c7; color: #92400e; }
+    .status-CONFIRMED { background: #dbeafe; color: #1e40af; }
+    .status-COMPLETED { background: #dcfce7; color: #166534; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 Daily Bookings Digest</h1>
+      <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 14px;">{{date_today}} • {{business_name}}</p>
+    </div>
+    
+    <div class="content">
+      <div class="metrics">
+        <div>
+          <div class="metric-val">{{total_count}}</div>
+          <div class="metric-lbl">Total Bookings</div>
+        </div>
+        <div>
+          <div class="metric-val">₹{{total_revenue}}</div>
+          <div class="metric-lbl">Estimated Revenue</div>
+        </div>
+        <div>
+          <div class="metric-val">{{new_count}}</div>
+          <div class="metric-lbl">Pending Actions</div>
+        </div>
+      </div>
+      
+      <h3 style="margin: 20px 0 10px 0; font-size: 16px;">Today's Activity Log</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Ref</th>
+            <th>Customer</th>
+            <th>Route</th>
+            <th>Travel Date</th>
+            <th>Fare</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{table_rows}}
+        </tbody>
+      </table>
+      
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="{{admin_url}}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">Open Dispatch Admin</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

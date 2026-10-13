@@ -1,0 +1,13 @@
+# Build and dependencies
+dist/
+dist-ssr/
+node_modules/
+coverage/
+
+# Environment files
+.env*
+!.env.example
+
+# Lockfiles and logs
+package-lock.json
+*.log

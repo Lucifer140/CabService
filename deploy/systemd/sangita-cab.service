@@ -1,0 +1,28 @@
+[Unit]
+Description=Sangita Travels Pune (Pune Mumbai Cab) Production API Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/punemumbaicab/backend
+Environment=ENVIRONMENT=production
+Environment=PORT=8080
+Environment=DATABASE_PATH=/var/www/punemumbaicab/backend/data/bookings.db
+ExecStart=/usr/bin/python3 /var/www/punemumbaicab/backend/server.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sangita-cab
+
+# Security Sandboxing
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

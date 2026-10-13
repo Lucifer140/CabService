@@ -1,0 +1,19 @@
+{
+  "name": "Sangita Travels Pune — Pune Mumbai Cab",
+  "short_name": "Sangita Travels",
+  "description": "Book verified Pune to Mumbai cabs, Mumbai Airport T1/T2 drops, and outstation holiday tours with 24/7 support.",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0F1D",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

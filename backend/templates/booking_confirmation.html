@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmation - {{business_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { margin: 0; color: #94a3b8; font-size: 14px; }
+    .badge { display: inline-block; background: #f59e0b; color: #000000; font-weight: 700; padding: 6px 14px; border-radius: 20px; font-size: 13px; margin-top: 12px; }
+    .content { padding: 32px 24px; }
+    .trip-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0; }
+    .trip-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #cbd5e1; font-size: 14px; }
+    .trip-row:last-child { border-bottom: none; }
+    .trip-label { color: #64748b; font-weight: 500; }
+    .trip-value { color: #0f172a; font-weight: 600; text-align: right; }
+    .fare-box { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 18px; text-align: center; margin: 24px 0; }
+    .fare-amount { font-size: 28px; font-weight: 800; color: #059669; }
+    .fare-note { font-size: 12px; color: #065f46; margin-top: 4px; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; font-weight: 600; padding: 14px 28px; border-radius: 8px; font-size: 15px; margin: 8px 4px; }
+    .btn-wa { background: #22c55e; }
+    .footer { background: #f8fafc; padding: 24px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    .footer a { color: #2563eb; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚕 {{business_name}}</h1>
+      <p>Premium Pune ⇄ Mumbai Intercity Cab Service</p>
+      <div class="badge">Booking Confirmed: {{booking_ref}}</div>
+    </div>
+    
+    <div class="content">
+      <p>Namaste <strong>{{customer_name}}</strong>,</p>
+      <p>Thank you for choosing Sangita Travels Pune. Your cab booking request has been successfully registered! Our dedicated dispatch team will allocate a verified chauffeur and vehicle shortly.</p>
+      
+      <div class="trip-card">
+        <div class="trip-row">
+          <span class="trip-label">Booking Reference</span>
+          <span class="trip-value">{{booking_ref}}</span>
+        </div>
+        <div class="trip-row">
+          <span class="trip-label">Trip Type</span>
+          <span class="trip-value">{{trip_type}}</span>
+        </div>
+        <div class="trip-row">
+          <span class="trip-label">Pickup Location</span>
+          <span class="trip-value">{{pickup_location}}</span>
+        </div>
+        <div class="trip-row">
+          <span class="trip-label">Drop Destination</span>
+          <span class="trip-value">{{drop_location}}</span>
+        </div>
+        <div class="trip-row">
+          <span class="trip-label">Date & Time</span>
+          <span class="trip-value">{{travel_date}} ({{travel_time}})</span>
+        </div>
+        {% if return_date %}
+        <div class="trip-row">
+          <span class="trip-label">Return Date</span>
+          <span class="trip-value">{{return_date}}</span>
+        </div>
+        {% endif %}
+        <div class="trip-row">
+          <span class="trip-label">Vehicle Selected</span>
+          <span class="trip-value">{{vehicle_name}} ({{passengers}} Pax)</span>
+        </div>
+      </div>
+      
+      <div class="fare-box">
+        <div style="font-size: 13px; color: #047857; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Guaranteed Estimated Fare</div>
+        <div class="fare-amount">₹{{estimated_fare}}</div>
+        <div class="fare-note">✓ Includes Expressway Toll Tax, Fuel, AC Cab & Driver Allowance. Pay directly to driver upon arrival.</div>
+      </div>
+      
+      <div style="text-align: center; margin: 30px 0 10px 0;">
+        <a href="{{whatsapp_url}}" class="btn btn-wa" target="_blank">Chat with Dispatch on WhatsApp</a>
+        <a href="tel:{{support_phone}}" class="btn">Call 24/7 Helpline</a>
+      </div>
+      
+      <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin-top: 24px;">
+        <strong>Driver Details:</strong> Your driver name, contact number, and vehicle registration plate will be shared via SMS and WhatsApp approximately 2 hours before your scheduled pickup.
+      </p>
+    </div>
+    
+    <div class="footer">
+      <p><strong>{{business_name}}</strong> • Helpline: (+91) {{support_phone}}</p>
+      <p>Office Address: {{business_address}}</p>
+      <p>Need urgent assistance? Reply directly to this email or call <a href="tel:{{support_phone}}">+91 {{support_phone}}</a></p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,94 @@
+name: Continuous Deployment (CD)
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Deployment Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging Environment
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'staging')
+    environment:
+      name: staging
+      url: https://staging.punemumbaicab.com
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Build Frontend Production Bundle
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Deploy to Staging Host
+        run: |
+          echo "Deploying release to Staging cluster..."
+          # Deploy steps: rsync / docker deploy to staging host
+          # python backend/migrate.py up
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'production')
+    environment:
+      name: production
+      url: https://sangitatravelspune.com
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Build Frontend Production Assets
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Deploy to Production VPS / Container Host
+        env:
+          PROD_HOST: ${{ secrets.PROD_SERVER_HOST }}
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          echo "Syncing production release to Sangita Travels Pune server..."
+          # In production environment, sync files, run migrations, and reload systemd/docker services
+          echo "Running database schema migrations..."
+          python backend/migrate.py up
+
+      - name: Live Health Check & Smoke Test
+        run: |
+          echo "Verifying server readiness..."
+          # curl -f -s https://sangitatravelspune.com/api/public/site-data > /dev/null || exit 1

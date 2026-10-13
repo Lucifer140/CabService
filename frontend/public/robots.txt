@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /login.html
+
+Sitemap: https://sangitatravelspune.com/sitemap.xml
+Sitemap: https://punemumbaicab.com/sitemap.xml

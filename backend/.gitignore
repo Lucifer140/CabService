@@ -1,0 +1,43 @@
+# ==============================================================================
+# SANGITA TRAVELS PUNE - BACKEND SPECIFIC .GITIGNORE
+# ==============================================================================
+
+# Environment files
+.env
+.env.*
+*.env
+*.env.local
+!.env.example
+
+# SQLite Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.bak
+data/*.db
+data/*.db-*
+!data/.gitkeep
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging & distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing & linting caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/

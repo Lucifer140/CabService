@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚨 New Booking Alert - {{booking_ref}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }
+    .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
+    .header { background: #dc2626; padding: 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+    .content { padding: 24px; }
+    .alert-banner { background: #450a0a; border: 1px solid #991b1b; border-radius: 8px; padding: 12px; margin-bottom: 20px; text-align: center; color: #fca5a5; font-size: 14px; }
+    .grid { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .grid td { padding: 10px 12px; border-bottom: 1px solid #334155; font-size: 14px; }
+    .grid td.label { color: #94a3b8; font-weight: 500; width: 40%; }
+    .grid td.val { color: #f8fafc; font-weight: 600; }
+    .btn { display: inline-block; background: #3b82f6; color: #ffffff !important; text-decoration: none; font-weight: 600; padding: 12px 24px; border-radius: 8px; margin: 6px; }
+    .btn-call { background: #10b981; }
+    .footer { padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #334155; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚨 NEW CAB DISPATCH ALERT</h1>
+      <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">Action Required: Assign Driver & Confirm</p>
+    </div>
+    
+    <div class="content">
+      <div class="alert-banner">
+        Reference: <strong>{{booking_ref}}</strong> • Estimated Fare: <strong>₹{{estimated_fare}}</strong>
+      </div>
+      
+      <table class="grid">
+        <tr>
+          <td class="label">Customer Name</td>
+          <td class="val">{{customer_name}}</td>
+        </tr>
+        <tr>
+          <td class="label">Customer Phone</td>
+          <td class="val"><a href="tel:{{customer_phone}}" style="color: #60a5fa; text-decoration: none;">{{customer_phone}}</a></td>
+        </tr>
+        <tr>
+          <td class="label">Customer Email</td>
+          <td class="val">{{customer_email}}</td>
+        </tr>
+        <tr>
+          <td class="label">Route</td>
+          <td class="val">{{pickup_location}} ➔ {{drop_location}}</td>
+        </tr>
+        <tr>
+          <td class="label">Travel Date & Time</td>
+          <td class="val">{{travel_date}} at {{travel_time}}</td>
+        </tr>
+        {% if return_date %}
+        <tr>
+          <td class="label">Return Date</td>
+          <td class="val">{{return_date}}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="label">Vehicle Required</td>
+          <td class="val">{{vehicle_name}} ({{passengers}} Pax)</td>
+        </tr>
+        <tr>
+          <td class="label">Trip Type</td>
+          <td class="val">{{trip_type}}</td>
+        </tr>
+      </table>
+      
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="https://wa.me/{{normalized_phone}}" class="btn btn-call" target="_blank">Chat with Customer</a>
+        <a href="{{admin_url}}" class="btn">Open Admin Desk</a>
+      </div>
+    </div>
+    
+    <div class="footer">
+      Automated dispatch alert from {{business_name}} backend engine.
+    </div>
+  </div>
+</body>
+</html>
