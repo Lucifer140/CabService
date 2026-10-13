@@ -4,8 +4,24 @@ HTTP Response & Request Parsing Utilities
 import json
 
 def get_client_ip(handler) -> str:
-    """Extracts client IP address from socket or returns 127.0.0.1."""
-    return handler.client_address[0] if handler.client_address else '127.0.0.1'
+    """Safely extracts client IP address from socket or trusted proxy headers."""
+    if not handler:
+        return '127.0.0.1'
+    peer_ip = handler.client_address[0] if getattr(handler, 'client_address', None) else '127.0.0.1'
+    
+    # Check trusted proxy headers if connection originates from loopback or container network
+    if peer_ip in ('127.0.0.1', '::1', 'localhost') or peer_ip.startswith(('172.', '10.', '192.168.')):
+        headers = getattr(handler, 'headers', {})
+        if headers:
+            x_forwarded = headers.get('X-Forwarded-For')
+            if x_forwarded:
+                candidate = x_forwarded.split(',')[0].strip()
+                if candidate:
+                    return candidate
+            x_real = headers.get('X-Real-IP')
+            if x_real:
+                return x_real.strip()
+    return peer_ip
 
 def read_json_body(handler) -> dict:
     """Safely extracts, parses and sanitizes JSON payload from incoming HTTP request body."""

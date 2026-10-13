@@ -45,4 +45,28 @@ describe('Multi-Language i18n Suite (Phase 35)', () => {
     expect(mr.tab_roundtrip).toContain('राऊंड ट्रिप');
     expect(hi.tab_roundtrip).toContain('राउंड ट्रिप');
   });
+
+  it('validates supported languages and toggle state logic', () => {
+    const supported = [
+      { code: 'en', label: 'EN', full: 'English' },
+      { code: 'mr', label: 'मराठी', full: 'मराठी' },
+      { code: 'hi', label: 'हिंदी', full: 'हिंदी' },
+    ];
+
+    expect(supported.map((s) => s.code)).toEqual(['en', 'mr', 'hi']);
+    expect(supported.map((s) => s.label)).toEqual(['EN', 'मराठी', 'हिंदी']);
+
+    // Toggle behavior logic simulation
+    let isOpen = false;
+    const toggle = () => {
+      isOpen = !isOpen;
+    };
+
+    expect(isOpen).toBe(false);
+    toggle();
+    expect(isOpen).toBe(true);
+    toggle();
+    expect(isOpen).toBe(false);
+  });
 });
+

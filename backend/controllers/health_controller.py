@@ -49,14 +49,12 @@ class HealthController:
             "status": "ready" if is_ready else "not_ready",
             "database": {
                 "connected": db_ok,
-                "tables_count": tables_count,
-                "path": DB_FILE,
-                "error": db_err
+                "tables_count": tables_count if db_ok else 0,
             },
             "storage": {
                 "uploads_writable": uploads_writable,
-                "uploads_dir": UPLOADS_DIR
             },
+            "environment": ENVIRONMENT,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 

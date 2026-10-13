@@ -1,13 +1,15 @@
 """
 Driver Management Repository
 """
+from __future__ import annotations
+from typing import Optional, Any
 from repositories.base_repository import BaseRepository
 
 class DriverRepository(BaseRepository):
     @classmethod
-    def list_all(cls, status: str = None, search: str = None, limit: int = 200) -> list:
-        conditions = []
-        params = []
+    def list_all(cls, status: Optional[str] = None, search: Optional[str] = None, limit: int = 200) -> list:
+        conditions: list[str] = []
+        params: list[Any] = []
         if status and status != 'ALL':
             conditions.append("status = ?")
             params.append(status)

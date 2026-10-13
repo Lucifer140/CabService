@@ -18,11 +18,15 @@ ROUTE_LIMITS = {
     '/api/login': (5, 60),
     '/api/auth/login': (5, 60),
     '/api/auth/forgot-password': (5, 60),
+    '/api/auth/reset-password': (5, 60),
     '/api/bookings': (15, 60),
     '/api/public/bookings': (15, 60),
     '/api/track-event': (60, 60),
     '/api/public/track-event': (60, 60),
     '/api/payments/create-order': (10, 60),
+    '/api/payments/verify': (10, 60),
+    '/api/reviews': (5, 60),
+    '/api/public/reviews': (5, 60),
 }
 
 DEFAULT_LIMIT = (120, 60)  # 120 reqs/minute for all other routes

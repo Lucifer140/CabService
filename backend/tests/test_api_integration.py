@@ -5,13 +5,41 @@ Tests live API endpoints over HTTP against the server.
 
 import json
 import urllib.request
+import os
+import sys
 import urllib.error
 import unittest
+from typing import Optional
+
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(TEST_DIR)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+from core.database import transaction
+from core.security import hash_password
 
 BASE_URL = "http://127.0.0.1:8080"
 
 class TestApiIntegration(unittest.TestCase):
-    def _make_request(self, path: str, method: str = "GET", data: dict = None, headers: dict = None):
+    @classmethod
+    def setUpClass(cls):
+        with transaction() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM admins WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                pwd_hash, salt = hash_password("admin123")
+                cur.execute("""
+                    INSERT INTO admins (username, password_hash, password_salt, full_name, phone, email, role, is_active)
+                    VALUES ('admin', ?, ?, 'API Test Admin', '9999999999', 'testadmin@sangitatravels.com', 'SUPER_ADMIN', 1)
+                """, (pwd_hash, salt))
+
+    @classmethod
+    def tearDownClass(cls):
+        with transaction() as conn:
+            conn.execute("DELETE FROM admins WHERE username = 'admin' AND email = 'testadmin@sangitatravels.com';")
+    def _make_request(self, path: str, method: str = "GET", data: Optional[dict] = None, headers: Optional[dict] = None):
         url = f"{BASE_URL}{path}"
         req_headers = {"Origin": "http://localhost:5173"}
         if headers:

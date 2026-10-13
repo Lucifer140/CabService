@@ -17,8 +17,14 @@ class PricingController:
     def calculate_route(handler):
         parsed = urlparse(handler.path)
         qs = parse_qs(parsed.query)
-        pickup = qs.get('pickup', ['Pune'])[0]
-        drop = qs.get('drop', ['Mumbai'])[0]
+        pickup = qs.get('pickup', [''])[0].strip()
+        drop = qs.get('drop', [''])[0].strip()
+
+        if not pickup or not drop:
+            return send_error(handler, "Pickup and drop locations are required", status=400)
+
+        if pickup.lower() == drop.lower():
+            return send_error(handler, "Pickup and drop locations cannot be identical", status=400)
 
         route_info = MapsService.calculate_distance(pickup, drop)
         return send_json(handler, {"success": True, "route": route_info})
@@ -26,10 +32,16 @@ class PricingController:
     @staticmethod
     def calculate_fare(handler):
         body = read_json_body(handler)
-        pickup = body.get('pickup') or body.get('pickup_location') or 'Pune'
-        drop = body.get('drop') or body.get('drop_location') or 'Mumbai'
+        pickup = (body.get('pickup') or body.get('pickup_location') or '').strip()
+        drop = (body.get('drop') or body.get('drop_location') or '').strip()
         vehicle_key = (body.get('vehicle') or body.get('vehicle_key') or 'dzire').lower()
         trip_type = (body.get('trip_type') or body.get('tripType') or 'oneway').lower()
+
+        if not pickup or not drop:
+            return send_error(handler, "Pickup and drop locations are required", status=400)
+
+        if pickup.lower() == drop.lower():
+            return send_error(handler, "Pickup and drop locations cannot be identical", status=400)
 
         # Find pricing rule
         rule = PricingRepository.get_by_vehicle_key(vehicle_key)

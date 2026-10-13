@@ -12,13 +12,18 @@ def hash_password(password: str, salt: str = None):
     pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
     return pwd_hash, salt
 
+import hmac
+
 def verify_password(password: str, stored_hash: str, salt: str):
-    """Verifies a plain password against the stored PBKDF2 hash and salt."""
+    """Verifies a plain password against the stored PBKDF2 hash and salt using constant-time comparison."""
+    if not stored_hash:
+        return False
     if not salt:
         # Fallback to legacy sha256 without salt for backward compatibility
-        return hashlib.sha256(password.encode('utf-8')).hexdigest() == stored_hash
+        legacy_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        return hmac.compare_digest(legacy_hash, stored_hash)
     pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
-    return pwd_hash == stored_hash
+    return hmac.compare_digest(pwd_hash, stored_hash)
 
 def generate_session_token() -> str:
     """Generates a secure 32-byte (64-char hex) session token."""

@@ -114,19 +114,26 @@ class PaymentService:
         Verifies Razorpay HMAC signature or validates sandbox test signature.
         Updates payment and booking status upon verification.
         """
+        from core.config import ENVIRONMENT
         verified = False
 
-        if order_id.startswith('order_sim_') or not RAZORPAY_ENABLED or not RAZORPAY_KEY_SECRET:
-            # Sandbox validation: accepts test payments
-            verified = True
-        else:
+        if order_id.startswith('order_sim_'):
+            if ENVIRONMENT == 'development':
+                # Development test sandbox only
+                verified = True
+            else:
+                logger.warning(f"Rejected simulated payment order in {ENVIRONMENT} mode: {order_id}")
+                return {"success": False, "error": "Simulated sandbox payments are strictly prohibited in production."}
+        elif RAZORPAY_ENABLED and RAZORPAY_KEY_SECRET:
             try:
                 msg = f"{order_id}|{payment_id}".encode('utf-8')
                 expected = hmac.new(RAZORPAY_KEY_SECRET.encode('utf-8'), msg, hashlib.sha256).hexdigest()
-                verified = hmac.compare_digest(expected, signature)
+                verified = hmac.compare_digest(expected, signature or '')
             except Exception as e:
                 logger.error(f"Signature verification error: {e}")
                 verified = False
+        else:
+            return {"success": False, "error": "Online payment gateway is disabled or unconfigured."}
 
         if not verified:
             return {"success": False, "error": "Invalid payment signature."}
@@ -149,6 +156,18 @@ class PaymentService:
                     booking_ref = payment_rec['booking_ref']
                     amount = float(payment_rec['amount'])
                     payment_type = payment_rec['payment_type']
+
+                    # Idempotent safeguard: prevent duplicate balance increments
+                    if payment_rec['status'] == 'SUCCESS':
+                        return {
+                            "success": True,
+                            "message": "Payment already confirmed for this booking.",
+                            "order_id": order_id,
+                            "payment_id": payment_rec['payment_id'] or payment_id,
+                            "amount": amount,
+                            "booking_ref": booking_ref,
+                            "payment_type": payment_type
+                        }
 
                     # Update payment status
                     conn.execute("""

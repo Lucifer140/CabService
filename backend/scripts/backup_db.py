@@ -63,7 +63,7 @@ def create_backup(
     target_dir = backup_dir or os.path.join(DATA_DIR, "backups")
     os.makedirs(target_dir, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     backup_filename = f"bookings_backup_{timestamp}.db"
     backup_filepath = os.path.join(target_dir, backup_filename)
 
@@ -80,6 +80,19 @@ def create_backup(
         # 2. Native SQLite streaming backup
         with sqlite3.connect(backup_filepath) as dst_conn:
             src_conn.backup(dst_conn, pages=250)
+            try:
+                dst_conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                dst_conn.execute("PRAGMA journal_mode=DELETE;")
+            except Exception:
+                pass
+
+    # Clean up transient sidecar files so backup is a single self-contained file
+    for sidecar in [backup_filepath + "-wal", backup_filepath + "-shm"]:
+        if os.path.exists(sidecar):
+            try:
+                os.remove(sidecar)
+            except OSError:
+                pass
 
     elapsed_ms = round((time.time() - start_time) * 1000, 2)
     file_size_kb = round(os.path.getsize(backup_filepath) / 1024, 2)
@@ -108,6 +121,13 @@ def create_backup(
         for old_file in to_remove:
             try:
                 os.remove(old_file)
+                for ext in ["-wal", "-shm"]:
+                    sidecar_old = old_file + ext
+                    if os.path.exists(sidecar_old):
+                        try:
+                            os.remove(sidecar_old)
+                        except OSError:
+                            pass
                 removed_count += 1
             except OSError as e:
                 print(f"[!] Warning deleting old backup {old_file}: {e}")

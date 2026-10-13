@@ -24,7 +24,7 @@ class WhatsAppService:
     @staticmethod
     def normalize_phone(phone: str) -> str:
         """Sanitizes phone number to international E.164 without plus sign (e.g., 919876543210)."""
-        clean = ''.join(ch for ch in str(phone) if ch.isdigit())
+        clean = ''.join(ch for ch in phone if ch.isdigit())
         if len(clean) == 10:
             return f"91{clean}"
         if len(clean) == 12 and clean.startswith('91'):

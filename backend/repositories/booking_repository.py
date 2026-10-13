@@ -1,7 +1,6 @@
-"""
-Booking Repository
-"""
+from __future__ import annotations
 import secrets
+from typing import Any, Optional
 from repositories.base_repository import BaseRepository
 from repositories.customer_repository import CustomerRepository
 
@@ -33,8 +32,9 @@ class BookingRepository(BaseRepository):
                 booking_ref, customer_id, customer_name, customer_phone, customer_email,
                 trip_type, pickup_location, drop_location, travel_date, travel_time, return_date,
                 vehicle_key, vehicle_name, estimated_fare, quoted_amount, final_amount,
-                status, assigned_driver, driver_phone, customer_notes, internal_notes, passengers
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                status, assigned_driver, driver_phone, customer_notes, internal_notes, passengers,
+                distance_km, duration_text, toll_amount, quotation_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         b_id = cls.execute(sql, (
             booking_ref, customer_id, cust_name, cust_phone, cust_email,
@@ -54,7 +54,11 @@ class BookingRepository(BaseRepository):
             data.get('driver_phone', ''),
             data.get('customer_notes', ''),
             data.get('internal_notes', ''),
-            data.get('passengers', 1)
+            data.get('passengers', 1),
+            float(data.get('distance_km', 0.0)),
+            str(data.get('duration_text', '')),
+            float(data.get('toll_amount', 0.0)),
+            str(data.get('quotation_snapshot', '{}'))
         ))
         return cls.get_by_id(b_id)
 
@@ -69,11 +73,21 @@ class BookingRepository(BaseRepository):
         return cls.query_one(sql, (booking_id,))
 
     @classmethod
-    def list_all(cls, status: str = None, search: str = None, vehicle_key: str = None,
-                 start_date: str = None, end_date: str = None, assigned_driver: str = None,
-                 page: int = 1, per_page: int = 25, limit: int = None) -> dict:
-        params = []
-        conditions = []
+    def get_by_ref(cls, booking_ref: str) -> dict:
+        sql = """
+            SELECT b.*, c.name as customer_name_rel
+            FROM bookings b
+            LEFT JOIN customers c ON b.customer_id = c.id
+            WHERE b.booking_ref = ?;
+        """
+        return cls.query_one(sql, (booking_ref,))
+
+    @classmethod
+    def list_all(cls, status: Optional[str] = None, search: Optional[str] = None, vehicle_key: Optional[str] = None,
+                 start_date: Optional[str] = None, end_date: Optional[str] = None, assigned_driver: Optional[str] = None,
+                 page: int = 1, per_page: int = 25, limit: Optional[int] = None) -> dict:
+        params: list[Any] = []
+        conditions: list[str] = []
         if status and status != 'ALL':
             conditions.append("b.status = ?")
             params.append(status)
@@ -112,7 +126,7 @@ class BookingRepository(BaseRepository):
             fetch_limit = per_page
             fetch_offset = max(0, (page - 1) * per_page)
 
-        query_params = list(params)
+        query_params: list[Any] = list(params)
         query_params.extend([fetch_limit, fetch_offset])
 
         sql = f"""

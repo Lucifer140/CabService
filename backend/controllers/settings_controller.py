@@ -3,6 +3,7 @@ System Settings, SEO & Database Backup Controller
 """
 import io
 import datetime
+from typing import Optional
 from core.database import get_db
 from core.response import send_json, send_error, read_json_body, get_client_ip
 from repositories.settings_repository import SettingsRepository
@@ -44,7 +45,7 @@ class SettingsController:
         return send_json(handler, {"success": True, "seo": seo})
 
     @staticmethod
-    def update_seo(handler, user: dict, path_page_id: str = None):
+    def update_seo(handler, user: dict, path_page_id: Optional[str] = None):
         body = read_json_body(handler)
         page_id = (path_page_id or body.get('page_key') or body.get('page_identifier') or 'home').strip()
         SeoRepository.update_page(page_id, body)

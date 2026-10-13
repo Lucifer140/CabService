@@ -1,6 +1,8 @@
 """
 Admin User & Session Repository
 """
+from __future__ import annotations
+from typing import Optional, Any, Dict, List
 from repositories.base_repository import BaseRepository
 
 class UserRepository(BaseRepository):
@@ -54,7 +56,7 @@ class UserRepository(BaseRepository):
         return row['count'] if row else 0
 
     @classmethod
-    def list_all(cls, search: str = None, role: str = None, status: str = None) -> list:
+    def list_all(cls, search: Optional[str] = None, role: Optional[str] = None, status: Optional[str] = None) -> list:
         sql = """
             SELECT id, username, full_name, email, phone, role, is_active,
                    failed_attempts, last_login, created_at, updated_at
@@ -109,7 +111,7 @@ class UserRepository(BaseRepository):
         cls.revoke_all_sessions(admin_id)
 
     @classmethod
-    def record_failed_attempt(cls, admin_id: int, failed_attempts: int, locked_until_str: str = None):
+    def record_failed_attempt(cls, admin_id: int, failed_attempts: int, locked_until_str: Optional[str] = None):
         sql = """
             UPDATE admins
             SET failed_attempts = ?, locked_until = ?

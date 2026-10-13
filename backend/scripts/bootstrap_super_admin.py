@@ -15,6 +15,7 @@ import os
 import re
 import getpass
 import argparse
+from typing import Optional
 
 # Add backend directory to sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +70,7 @@ def get_password(prompt_text="Enter Super Admin Password: ", confirm=True) -> st
 
         return pwd
 
-def bootstrap_super_admin(email: str, username: str = None, full_name: str = None, rotate: bool = False, check_only: bool = False):
+def bootstrap_super_admin(email: str, username: Optional[str] = None, full_name: Optional[str] = None, rotate: bool = False, check_only: bool = False):
     """Executes the idempotent Super Admin bootstrap or password rotation."""
     clean_email = normalize_email(email)
     if not validate_email_format(clean_email):

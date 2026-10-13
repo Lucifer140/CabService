@@ -13,14 +13,17 @@
 
 # 2. SQLite Relational Database Files & Journals
 *.db
+*.db.*
 *.db-journal
 *.db-wal
 *.db-shm
 *.db.bak
 data/*.db
 data/*.db-*
+data/*.db.*
 backend/data/*.db
 backend/data/*.db-*
+backend/data/*.db.*
 !**/data/.gitkeep
 !**/.gitkeep
 

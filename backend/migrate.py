@@ -15,6 +15,7 @@ import datetime
 import time
 import sys
 import glob
+from typing import Optional
 
 def load_env():
     base = os.path.dirname(os.path.abspath(__file__))
@@ -43,13 +44,13 @@ os.makedirs(DATA_DIR, exist_ok=True)
 db_env = os.environ.get('DATABASE_PATH', 'data/bookings.db')
 DB_FILE = db_env if os.path.isabs(db_env) else os.path.abspath(os.path.join(BASE_DIR, db_env))
 
-def hash_password(password: str, salt: str = None):
+def hash_password(password: str, salt: Optional[str] = None):
     if not salt:
         salt = secrets.token_hex(16)
     pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
     return pwd_hash, salt
 
-def backup_database(db_target: str, max_backups: int = 20) -> str:
+def backup_database(db_target: str, max_backups: int = 20) -> Optional[str]:
     """
     Safely creates an online, transactionally-consistent snapshot backup of the database
     using SQLite's native backup API (handles active connections and WAL files safely).
@@ -877,6 +878,22 @@ def rollback_009_admins_security_hardening(cursor):
     cursor.execute("DROP INDEX IF EXISTS idx_admins_role;")
     cursor.execute("DROP INDEX IF EXISTS idx_admins_active;")
 
+def migration_010_quotation_snapshot(cursor):
+    """Adds route distance, duration, toll, and quotation snapshot columns to bookings table."""
+    cursor.execute("PRAGMA table_info(bookings);")
+    existing_cols = {row['name'] for row in cursor.fetchall()}
+
+    if 'distance_km' not in existing_cols:
+        cursor.execute("ALTER TABLE bookings ADD COLUMN distance_km REAL DEFAULT 0.0;")
+    if 'duration_text' not in existing_cols:
+        cursor.execute("ALTER TABLE bookings ADD COLUMN duration_text VARCHAR(50) DEFAULT '';")
+    if 'toll_amount' not in existing_cols:
+        cursor.execute("ALTER TABLE bookings ADD COLUMN toll_amount REAL DEFAULT 0.0;")
+    if 'quotation_snapshot' not in existing_cols:
+        cursor.execute("ALTER TABLE bookings ADD COLUMN quotation_snapshot TEXT DEFAULT '{}';")
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_distance ON bookings(distance_km);")
+
 # Ordered list of all migrations
 MIGRATIONS = [
     ("20261012_001_core_schema", "Initial relational schema with 14 core tables", migration_001_core_schema),
@@ -888,6 +905,7 @@ MIGRATIONS = [
     ("20261013_007_coupons_table", "Add coupons and promo discount system table", migration_007_coupons_table),
     ("20261013_008_blog_posts_table", "Add blog posts and content marketing engine table", migration_008_blog_posts_table),
     ("20261013_009_admins_security_hardening", "Enforce unique email index and security indexes on admins", migration_009_admins_security_hardening),
+    ("20261013_010_quotation_snapshot", "Add distance, duration, toll, and quotation snapshot to bookings", migration_010_quotation_snapshot),
 ]
 
 ROLLBACKS = {

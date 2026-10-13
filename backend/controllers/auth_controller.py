@@ -1,7 +1,9 @@
 """
 Authentication & Session Controller
 """
+from __future__ import annotations
 import datetime
+from typing import Optional
 from core.config import ROLES
 from core.security import verify_password, generate_session_token
 from core.response import send_json, send_error, read_json_body, get_client_ip, get_auth_token
@@ -46,7 +48,7 @@ class AuthController:
         stored_salt = admin.get('password_salt', '')
         if not verify_password(password, stored_hash, stored_salt):
             failed = (admin.get('failed_attempts') or 0) + 1
-            locked_until_str = None
+            locked_until_str: Optional[str] = None
             if failed >= 5:
                 lock_time = now + datetime.timedelta(minutes=15)
                 locked_until_str = lock_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -191,8 +193,16 @@ class AuthController:
             del cls._reset_tokens[email]
             return send_error(handler, "Password reset code has expired. Please request a new one.", status=400)
 
-        if code != token_record['code'] and code != token_record['token']:
-            return send_error(handler, "Invalid verification code or token.", status=400)
+        import hmac
+        code_match = hmac.compare_digest(code, token_record.get('code', '')) or hmac.compare_digest(code, token_record.get('token', ''))
+        if not code_match:
+            token_record['failed_attempts'] = token_record.get('failed_attempts', 0) + 1
+            if token_record['failed_attempts'] >= 5:
+                del cls._reset_tokens[email]
+                AuditRepository.log(token_record.get('admin_id', 0), email, 'RESET_ATTEMPTS_EXCEEDED', 'auth', "Reset token destroyed after 5 failed code attempts", get_client_ip(handler))
+                return send_error(handler, "Too many failed verification attempts. Password reset request has been invalidated.", status=403)
+            remaining = 5 - token_record['failed_attempts']
+            return send_error(handler, f"Invalid verification code or token. {remaining} attempt(s) remaining.", status=400)
 
         from core.security import hash_password
         admin_id = token_record['admin_id']

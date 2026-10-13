@@ -54,6 +54,21 @@ class MediaController:
         if file_size > 10 * 1024 * 1024:
             return send_error(handler, "File size exceeds 10MB limit", status=400)
 
+        # SVG Stored XSS & XXE defense
+        if ext == '.svg':
+            try:
+                svg_text = file_bytes.decode('utf-8', errors='ignore')
+                # Neutralize dangerous scripts, foreignObject, inline event handlers, and DTD entities
+                svg_text = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', svg_text, flags=re.IGNORECASE | re.DOTALL)
+                svg_text = re.sub(r'<\s*foreignObject[^>]*>.*?<\s*/\s*foreignObject\s*>', '', svg_text, flags=re.IGNORECASE | re.DOTALL)
+                svg_text = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', '', svg_text, flags=re.IGNORECASE)
+                svg_text = re.sub(r'<!ENTITY[^>]*>', '', svg_text, flags=re.IGNORECASE)
+                svg_text = re.sub(r'javascript\s*:', '', svg_text, flags=re.IGNORECASE)
+                file_bytes = svg_text.encode('utf-8')
+                file_size = len(file_bytes)
+            except Exception:
+                return send_error(handler, "Invalid or unparseable SVG file format.", status=400)
+
         mime_type = mimetypes.guess_type(filename)[0] or 'image/jpeg'
         safe_name = f"{int(datetime.datetime.now().timestamp())}_{secrets.token_hex(4)}{ext}"
         file_disk_path = os.path.join(UPLOADS_DIR, safe_name)

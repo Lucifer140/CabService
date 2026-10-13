@@ -3,7 +3,8 @@ Booking Management Controller
 """
 import csv
 import io
-import datetime
+import json
+from datetime import datetime, date as dt_date, timezone
 from urllib.parse import urlparse, parse_qs
 from core.response import send_json, send_error, send_csv, read_json_body, get_client_ip
 from repositories.booking_repository import BookingRepository
@@ -14,42 +15,118 @@ from repositories.coupon_repository import CouponRepository
 from services.whatsapp_service import WhatsAppService
 from services.email_service import EmailService
 
+from services.maps_service import MapsService
+
 class BookingController:
     @staticmethod
     def create_public_booking(handler):
         body = read_json_body(handler)
-        name = body.get('name') or body.get('customer_name', '')
-        phone = body.get('phone') or body.get('customer_phone', '')
-        email = body.get('email') or body.get('customer_email', '')
-        pickup = body.get('pickup') or body.get('pickup_location', '')
-        drop = body.get('drop') or body.get('drop_location', '')
-        date = body.get('date') or body.get('travel_date', '')
-        time_val = body.get('time') or body.get('travel_time', 'Flexible')
-        trip_type = body.get('trip_type', 'oneway')
-        vehicle_key = body.get('vehicle') or body.get('vehicle_key', 'dzire')
-        passengers = int(body.get('passengers', 4))
-        fare_est = float(body.get('fare') or body.get('estimated_fare') or 0.0)
-
-        coupon_code = body.get('coupon') or body.get('coupon_code') or ''
-        discount_val = 0.0
-        applied_msg = ''
-        if coupon_code and coupon_code.strip():
-            c_res = CouponRepository.validate_coupon(coupon_code.strip(), fare_est)
-            if c_res.get('valid'):
-                discount_val = c_res.get('discount', 0.0)
-                CouponRepository.increment_used_count(c_res['coupon_id'])
-                fare_est = c_res.get('final_fare', fare_est)
-                applied_msg = f" (Promo {coupon_code.strip().upper()} applied: -₹{discount_val})"
-
+        name = str(body.get('name') or body.get('customer_name') or '').strip()
+        phone = str(body.get('phone') or body.get('customer_phone') or '').strip()
+        email = str(body.get('email') or body.get('customer_email') or '').strip()
+        pickup = str(body.get('pickup') or body.get('pickup_location') or '').strip()
+        drop = str(body.get('drop') or body.get('drop_location') or '').strip()
+        date = str(body.get('date') or body.get('travel_date') or '').strip()
+        time_val = str(body.get('time') or body.get('travel_time') or 'Flexible').strip()
+        trip_type = str(body.get('trip_type', 'oneway')).strip().lower()
+        vehicle_key = str(body.get('vehicle') or body.get('vehicle_key') or 'dzire').strip().lower()
         return_date = body.get('return_date') or body.get('returnDate') or None
 
+        # 1. Required fields check
         if not name or not phone or not pickup or not drop:
-            return send_error(handler, "Name, phone, pickup and drop locations are required.", status=400)
+            return send_error(handler, "Name, phone, pickup, and drop locations are required.", status=400)
 
+        # 2. Prevent identical pickup and drop
+        if pickup.lower() == drop.lower():
+            return send_error(handler, "Pickup and drop locations cannot be identical.", status=400)
+
+        # 3. Phone validation (at least 10 digits)
+        clean_phone_digits = ''.join(ch for ch in phone if ch.isdigit())
+        if len(clean_phone_digits) < 10:
+            return send_error(handler, "Please provide a valid 10-digit mobile number.", status=400)
+
+        # 4. Travel date validation (cannot be in the past)
+        if date:
+            try:
+                booking_dt = datetime.strptime(date, '%Y-%m-%d').date()
+                if booking_dt < dt_date.today():
+                    return send_error(handler, "Travel date cannot be in the past.", status=400)
+            except (ValueError, TypeError):
+                pass
+
+        # 5. Vehicle and passenger capacity validation
         vehicle_name = "Cab"
         veh = VehicleRepository.get_by_key(vehicle_key)
         if veh:
             vehicle_name = veh.get('name', 'Cab')
+        max_passengers = veh.get('passenger_capacity', 4) if veh else 4
+
+        try:
+            passengers = int(body.get('passengers', 4))
+        except (ValueError, TypeError):
+            passengers = 4
+
+        if passengers < 1 or passengers > max_passengers:
+            return send_error(
+                handler,
+                f"Passenger count must be between 1 and {max_passengers} for {vehicle_name}.",
+                status=400
+            )
+
+        # 6. Authoritative Server-Side Fare Calculation (Business Logic Hardening)
+        rule = PricingRepository.get_by_vehicle_key(vehicle_key)
+        if not rule:
+            rules = PricingRepository.list_all()
+            rule = rules[0] if rules else None
+
+        fare_est = 0.0
+        fare_breakdown = {}
+        if rule:
+            fare_breakdown = MapsService.compute_fare_breakdown(pickup, drop, rule, trip_type=trip_type)
+            fare_est = float(fare_breakdown.get('total_fare') or fare_breakdown.get('estimated_fare', 0.0))
+
+        # Fallback to base pricing if route calculation yields zero
+        if fare_est <= 0:
+            client_fare = float(body.get('fare') or body.get('estimated_fare') or 0.0)
+            fare_est = client_fare if client_fare >= 500.0 else float(rule.get('oneway_pune_mumbai', 2299.0) if rule else 2299.0)
+
+        # 7. Authoritative Coupon Verification
+        coupon_code = str(body.get('coupon') or body.get('coupon_code') or '').strip().upper()
+        discount_val = 0.0
+        applied_msg = ''
+        if coupon_code:
+            c_res = CouponRepository.validate_coupon(coupon_code, fare_est)
+            if c_res.get('valid'):
+                discount_val = c_res.get('discount', 0.0)
+                CouponRepository.increment_used_count(c_res['coupon_id'])
+                fare_est = c_res.get('final_fare', fare_est)
+                applied_msg = f" (Promo {coupon_code} applied: -₹{int(discount_val)})"
+
+        # 8. Build Authoritative Quotation Snapshot
+        dist_val = float(fare_breakdown.get('distance_km', 0.0))
+        dur_val = str(fare_breakdown.get('duration_text', ''))
+        toll_val = float(fare_breakdown.get('toll_amount', 0.0))
+        quotation_snapshot = {
+            "route": f"{pickup} ➔ {drop}",
+            "distance_km": dist_val,
+            "duration_text": dur_val,
+            "trip_type": trip_type,
+            "vehicle_key": vehicle_key,
+            "vehicle_name": vehicle_name,
+            "per_km_rate": fare_breakdown.get('per_km_rate', 0.0),
+            "billed_km": fare_breakdown.get('billed_km', 0.0),
+            "base_fare": fare_breakdown.get('base_fare', 0.0),
+            "base_km_fare": fare_breakdown.get('base_km_fare', 0.0),
+            "toll_amount": toll_val,
+            "toll_available": fare_breakdown.get('toll_available', True),
+            "toll_included": fare_breakdown.get('toll_included', True),
+            "driver_allowance": fare_breakdown.get('driver_allowance', 0.0),
+            "coupon_code": coupon_code or None,
+            "coupon_discount": discount_val,
+            "final_fare": fare_est,
+            "pricing_rule_id": rule.get('id') if rule else None,
+            "quotation_timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
         booking = BookingRepository.create({
             "customer_name": name,
@@ -64,9 +141,15 @@ class BookingController:
             "vehicle_key": vehicle_key,
             "vehicle_name": vehicle_name,
             "estimated_fare": fare_est,
+            "quoted_amount": fare_breakdown.get('total_fare', fare_est),
             "final_amount": fare_est,
             "passengers": passengers,
-            "customer_notes": f"Booked via website by {name} ({passengers} passengers)" + (f" - Return: {return_date}" if return_date else "") + applied_msg
+            "distance_km": dist_val,
+            "duration_text": dur_val,
+            "toll_amount": toll_val,
+            "quotation_snapshot": json.dumps(quotation_snapshot),
+            "customer_notes": f"Booked via website by {name} ({passengers} passengers)" + (f" - Return: {return_date}" if return_date else "") + applied_msg,
+            "internal_notes": f"Quotation: {dist_val}km ({dur_val}), Toll: ₹{int(toll_val)}, Base: ₹{int(fare_breakdown.get('base_fare', fare_est))}"
         })
 
         wa_result = WhatsAppService.send_booking_confirmation(booking)
@@ -230,7 +313,7 @@ class BookingController:
                 b.get('created_at', '')
             ])
 
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
         return send_csv(handler, f"cab_bookings_{timestamp}.csv", output.getvalue())
 
     @staticmethod

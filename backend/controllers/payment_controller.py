@@ -57,7 +57,7 @@ class PaymentController:
         body = read_json_body(handler)
         order_id = body.get('order_id') or body.get('razorpay_order_id')
         payment_id = body.get('payment_id') or body.get('razorpay_payment_id')
-        signature = body.get('signature') or body.get('razorpay_signature') or 'sim_sig_valid'
+        signature = body.get('signature') or body.get('razorpay_signature') or ''
 
         if not order_id or not payment_id:
             return send_error(handler, "Order ID and Payment ID are required.", status=400)
@@ -73,6 +73,39 @@ class PaymentController:
         booking = BookingRepository.get_by_id(booking_id)
         if not booking:
             return send_error(handler, "Booking not found", status=404)
+
+        # Access Control (BOLA/IDOR Defense):
+        # Allow authenticated staff/admins OR customers verifying with booking ref + registered phone
+        from core.response import get_auth_token
+        from repositories.user_repository import UserRepository
+        from urllib.parse import urlparse, parse_qs
+
+        is_authorized = False
+        token = get_auth_token(handler)
+        if token:
+            user = UserRepository.get_session_user(token)
+            if user:
+                is_authorized = True
+
+        if not is_authorized:
+            parsed = urlparse(handler.path)
+            qs = parse_qs(parsed.query)
+            provided_ref = (qs.get('ref') or [None])[0]
+            provided_phone = (qs.get('phone') or [None])[0]
+
+            if provided_ref and provided_phone:
+                b_ref = booking.get('booking_ref', '').strip().upper()
+                c_phone = ''.join(ch for ch in str(booking.get('customer_phone', '')) if ch.isdigit())[-10:]
+                p_phone = ''.join(ch for ch in str(provided_phone) if ch.isdigit())[-10:]
+                if provided_ref.strip().upper() == b_ref and c_phone == p_phone:
+                    is_authorized = True
+
+        if not is_authorized:
+            return send_error(
+                handler,
+                "Access denied: Administrative authentication or matching booking reference and phone number required to view this invoice.",
+                status=403
+            )
 
         html = PaymentService.generate_invoice_html(booking)
         return send_html(handler, html)

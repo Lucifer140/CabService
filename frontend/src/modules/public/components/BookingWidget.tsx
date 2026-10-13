@@ -15,11 +15,13 @@ import {
   Users,
   Navigation,
   Tag,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { PaymentWidget } from './PaymentWidget';
 import { useLanguage } from '../../../i18n/LanguageContext';
-
-
+import { PlacesAutocompleteInput } from './PlacesAutocompleteInput';
+import { GoogleRouteMap } from './GoogleRouteMap';
 
 interface BookingWidgetProps {
   onBookingSuccess?: (ref: string) => void;
@@ -83,14 +85,22 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
   } | null>(null);
   const [showPayment, setShowPayment] = useState(false);
 
-
   const [routeInfo, setRouteInfo] = useState<{
     distance_km: number;
     duration_text: string;
+    toll_amount: number | null;
+    toll_available: boolean;
+    toll_display?: string;
   }>({
     distance_km: 152,
     duration_text: '3h 15m via Expressway',
+    toll_amount: 320,
+    toll_available: true,
+    toll_display: '₹320 Expressway Toll',
   });
+  const [fareBreakdown, setFareBreakdown] = useState<any>(null);
+  const [isCalculatingFare, setIsCalculatingFare] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   const PUNE_LOCATIONS = [
     'Pune Airport (PNQ)',
@@ -103,6 +113,7 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
     'Hadapsar / Magarpatta, Pune',
     'Kharadi / EON IT Park, Pune',
     'Swargate, Pune',
+    'Pimpri-Chinchwad, Pune',
   ];
 
   const MUMBAI_LOCATIONS = [
@@ -116,34 +127,68 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
     'Thane West, Mumbai',
     'Andheri East / SEEPZ, Mumbai',
     'Colaba / Nariman Point, Mumbai',
+    'Nashik City Centre',
+    'Shirdi Mandir',
+    'Lonavala Market',
+    'Mahabaleshwar',
   ];
 
-  // Fetch real-time distance from backend
+  // Fetch real-time authoritative distance, duration, toll and fare from backend
+  const fetchAuthoritativeFare = async () => {
+    const pick = pickup.trim();
+    const drp = drop.trim();
+    if (pick.length < 2 || drp.length < 2) return;
+    if (pick.toLowerCase() === drp.toLowerCase()) {
+      setRouteError('Pickup and drop locations cannot be identical.');
+      return;
+    }
+    setRouteError(null);
+    setIsCalculatingFare(true);
+    try {
+      const res = await api.post<{
+        success: boolean;
+        pricing: any;
+      }>('/api/public/calculate-fare', {
+        pickup: pick,
+        drop: drp,
+        vehicle,
+        trip_type: tripType,
+      });
+      if (res.success && res.pricing) {
+        setFareBreakdown(res.pricing);
+        setRouteInfo({
+          distance_km: res.pricing.distance_km || 152,
+          duration_text: res.pricing.duration_text || '3h 15m',
+          toll_amount: res.pricing.toll_amount !== undefined ? res.pricing.toll_amount : 320,
+          toll_available: res.pricing.toll_available !== false,
+          toll_display:
+            res.pricing.toll_display ||
+            (res.pricing.toll_available && res.pricing.toll_amount > 0
+              ? `₹${res.pricing.toll_amount}`
+              : 'Toll estimate unavailable'),
+        });
+      }
+    } catch (err: any) {
+      setRouteError(err?.message || 'Could not calculate authoritative fare');
+    } finally {
+      setIsCalculatingFare(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    const timer = setTimeout(async () => {
-      if (pickup.trim().length >= 3 && drop.trim().length >= 3) {
-        try {
-          const res = await api.get<{
-            success: boolean;
-            route: { distance_km: number; duration_text: string };
-          }>(
-            `/api/public/route-distance?pickup=${encodeURIComponent(pickup)}&drop=${encodeURIComponent(drop)}`
-          );
-          if (isMounted && res.success && res.route) {
-            setRouteInfo(res.route);
-          }
-        } catch {
-          // fallback to default
-        }
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        fetchAuthoritativeFare();
       }
-    }, 350);
+    }, 400);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [pickup, drop]);
+  }, [pickup, drop, vehicle, tripType]);
+
 
   // Sync when selectedVehicleKey prop changes without triggering cascading render effect
   const [prevVehicleKey, setPrevVehicleKey] = useState(selectedVehicleKey);
@@ -247,8 +292,11 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
   };
 
   const currentFare = useMemo(() => {
+    if (fareBreakdown && fareBreakdown.vehicle_key === vehicle && fareBreakdown.total_fare) {
+      return Math.round(fareBreakdown.total_fare);
+    }
     return calculateFare(vehicle, tripType, pickup, drop);
-  }, [vehicle, tripType, pickup, drop, pricingRules, displayFleet, routeInfo.distance_km]);
+  }, [fareBreakdown, vehicle, tripType, pickup, drop, pricingRules, displayFleet, routeInfo.distance_km]);
 
   const effectiveFare = useMemo(() => {
     if (!appliedCoupon) return currentFare;
@@ -551,8 +599,8 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
                 ₹{confirmedBooking.fare}
               </strong>
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '6px' }}>
-              * Includes Toll Tax, AC Cab, Fuel & Driver Allowance. Pay directly to driver.
+            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '6px' }}>
+              * All Tolls not Included. Includes AC Cab, Fuel & Chauffeur Allowance. Doorstep Pickup & Drop.
             </div>
           </div>
 
@@ -677,93 +725,29 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
               marginBottom: '18px',
             }}
           >
-            {/* Pickup */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.78rem',
-                  color: '#94A3B8',
-                  marginBottom: '6px',
-                  fontWeight: 600,
-                }}
-              >
-                {t('lbl_pickup', 'Pickup Location')} *
-              </label>
-              <div style={{ position: 'relative' }}>
-                <MapPin
-                  size={18}
-                  style={{ position: 'absolute', left: '12px', top: '12px', color: '#3B82F6' }}
-                />
-                <input
-                  type="text"
-                  list="pune-locations"
-                  value={pickup}
-                  onChange={e => setPickup(e.target.value)}
-                  placeholder="e.g. Pune City / Hinjewadi"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '11px 12px 11px 38px',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '10px',
-                    color: '#fff',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <datalist id="pune-locations">
-                  {PUNE_LOCATIONS.map(loc => (
-                    <option key={loc} value={loc} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
+            {/* Pickup Location with Google Places Autocomplete */}
+            <PlacesAutocompleteInput
+              id="booking-pickup"
+              label={t('lbl_pickup', 'Pickup Location')}
+              value={pickup}
+              onChange={(val) => setPickup(val)}
+              placeholder="e.g. Pune City / Hinjewadi / Airport"
+              suggestedLocations={PUNE_LOCATIONS}
+              accentColor="#3B82F6"
+              required
+            />
 
-            {/* Drop */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.78rem',
-                  color: '#94A3B8',
-                  marginBottom: '6px',
-                  fontWeight: 600,
-                }}
-              >
-                {t('lbl_drop', 'Drop Location')} *
-              </label>
-              <div style={{ position: 'relative' }}>
-                <MapPin
-                  size={18}
-                  style={{ position: 'absolute', left: '12px', top: '12px', color: '#10B981' }}
-                />
-                <input
-                  type="text"
-                  list="mumbai-locations"
-                  value={drop}
-                  onChange={e => setDrop(e.target.value)}
-                  placeholder="e.g. Mumbai Airport T2"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '11px 12px 11px 38px',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '10px',
-                    color: '#fff',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <datalist id="mumbai-locations">
-                  {MUMBAI_LOCATIONS.map(loc => (
-                    <option key={loc} value={loc} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
+            {/* Drop Location with Google Places Autocomplete */}
+            <PlacesAutocompleteInput
+              id="booking-drop"
+              label={t('lbl_drop', 'Drop Location')}
+              value={drop}
+              onChange={(val) => setDrop(val)}
+              placeholder="e.g. Mumbai Airport T2 / Dadar / Thane"
+              suggestedLocations={MUMBAI_LOCATIONS}
+              accentColor="#10B981"
+              required
+            />
 
             {/* Travel Date */}
             <div>
@@ -882,36 +866,108 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
             </div>
           </div>
 
-          {/* Live Route Distance & Duration Preview Badge */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '10px',
-              padding: '10px 16px',
-              marginBottom: '16px',
-              background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.3) 0%, rgba(15, 23, 42, 0.6) 100%)',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
-              borderRadius: '12px',
-              fontSize: '0.82rem',
-              color: '#93C5FD',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Navigation size={15} style={{ color: '#60A5FA' }} />
-              <span>
-                Calculated Route:{' '}
-                <strong style={{ color: '#FFFFFF', fontSize: '0.9rem' }}>
-                  {routeInfo.distance_km} km
-                </strong>{' '}
-                • <span style={{ color: '#BFDBFE' }}>{routeInfo.duration_text}</span>
-              </span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'flex', gap: '12px' }}>
-              <span>✓ All Expressway Tolls Included</span>
-              <span>✓ Doorstep Pickup & Drop</span>
+          {/* Vehicle Selection */}
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.78rem',
+                color: '#94A3B8',
+                marginBottom: '8px',
+                fontWeight: 600,
+              }}
+            >
+              Select Preferred Vehicle *
+            </label>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '10px',
+              }}
+            >
+              {displayFleet.map((car) => {
+                const isSelected = vehicle === car.vehicle_key;
+                return (
+                  <button
+                    key={car.vehicle_key}
+                    type="button"
+                    onClick={() => {
+                      setVehicle(car.vehicle_key);
+                      if (passengers > (car.passenger_capacity || 4)) {
+                        setPassengers(car.passenger_capacity || 4);
+                      }
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: isSelected
+                        ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(30, 41, 59, 0.95) 100%)'
+                        : 'rgba(30, 41, 59, 0.6)',
+                      border: isSelected
+                        ? '2px solid #3B82F6'
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: isSelected ? '0 4px 16px rgba(59, 130, 246, 0.3)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          color: isSelected ? '#FFFFFF' : '#E2E8F0',
+                        }}
+                      >
+                        {car.name.split('(')[0].trim()}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          background: isSelected
+                            ? 'rgba(59, 130, 246, 0.3)'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          color: isSelected ? '#93C5FD' : '#94A3B8',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {car.category || 'Cab'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginBottom: '6px' }}>
+                      {car.passenger_capacity} Seats • {car.luggage_capacity || 'Boot Space'}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: isSelected ? '#38BDF8' : '#64748B',
+                        }}
+                      >
+                        {isSelected ? '✓ Selected' : 'Choose Vehicle'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -935,7 +991,7 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {t('lbl_vehicle', 'Choose Vehicle')} *
+                {t('lbl_vehicle', 'Select Preferred Vehicle')} *
               </label>
               <div style={{ position: 'relative' }}>
                 <Car
@@ -964,15 +1020,11 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  {displayFleet.map(car => {
-                    const dynamicRate = calculateFare(car.vehicle_key, tripType, pickup, drop);
-                    return (
-                      <option key={car.vehicle_key} value={car.vehicle_key}>
-                        {car.name} ({car.category}, {car.passenger_capacity} Seater) — ₹
-                        {dynamicRate}
-                      </option>
-                    );
-                  })}
+                  {displayFleet.map(car => (
+                    <option key={car.vehicle_key} value={car.vehicle_key}>
+                      {car.name} ({car.category}, {car.passenger_capacity} Seater)
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1243,14 +1295,14 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
             )}
           </div>
 
-          {/* Action & Real-Time Fare Bar */}
+          {/* Action & Booking Submission Bar */}
           <div
             className="booking-action-bar"
             style={{
               display: 'flex',
               flexWrap: 'wrap',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               background: 'rgba(30, 41, 59, 0.65)',
               padding: '16px 20px',
               borderRadius: '16px',
@@ -1258,104 +1310,52 @@ export const BookingWidget: React.FC<BookingWidgetProps> = ({
               gap: '16px',
             }}
           >
-            <div>
-              <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>
-                Guaranteed All-Inclusive Fare
-              </div>
-              <div
-                style={{
-                  fontSize: 'clamp(1.4rem, 3vw, 1.8rem)',
-                  fontWeight: 800,
-                  color: '#10B981',
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                }}
-              >
-                {appliedCoupon && (
-                  <span
-                    style={{
-                      textDecoration: 'line-through',
-                      color: '#64748B',
-                      fontSize: '1.2rem',
-                    }}
-                  >
-                    ₹{currentFare}
-                  </span>
-                )}
-                <span>₹{effectiveFare}</span>
-                {appliedCoupon && (
-                  <span
-                    style={{
-                      background: 'rgba(16, 185, 129, 0.2)',
-                      color: '#6EE7B7',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Save ₹{appliedCoupon.discount}
-                  </span>
-                )}
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    color: '#94A3B8',
-                    fontWeight: 500,
-                  }}
-                >
-                  (Toll, AC & Driver Included)
-                </span>
-              </div>
-            </div>
-
             <div
               className="booking-action-buttons"
-              style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}
+              style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', width: '100%', justifyContent: 'flex-end' }}
             >
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!routeError}
                 style={{
-                  padding: '13px 26px',
+                  padding: '14px 30px',
                   background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
                   border: 'none',
                   borderRadius: '12px',
                   color: '#ffffff',
-                  fontSize: '0.95rem',
+                  fontSize: '0.98rem',
                   fontWeight: 700,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  cursor: isSubmitting || !!routeError ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting || !!routeError ? 0.7 : 1,
                   boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  minHeight: '46px',
+                  minHeight: '48px',
                 }}
               >
-                <span>{isSubmitting ? 'Confirming Cab...' : `${t('btn_confirm_booking', 'Book Cab Now')} →`}</span>
+                <span>{isSubmitting ? 'Confirming Cab...' : `${t('btn_confirm_booking', 'Book This Cab')} →`}</span>
               </button>
 
               <a
-                href={`https://wa.me/918261021008?text=Hello%20Sangita%20Travels,%20I%20want%20to%20book%20a%20cab%20from%20${encodeURIComponent(pickup)}%20to%20${encodeURIComponent(drop)}%20for%20₹${currentFare}`}
+                href={`https://wa.me/918261021008?text=Hello%20Sangita%20Travels,%20I%20want%20to%20book%20a%20cab%20from%20${encodeURIComponent(pickup)}%20to%20${encodeURIComponent(drop)}`}
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  padding: '13px 20px',
+                  padding: '14px 22px',
                   background: 'rgba(37, 211, 102, 0.15)',
                   border: '1px solid rgba(37, 211, 102, 0.3)',
                   borderRadius: '12px',
                   color: '#4ADE80',
-                  fontSize: '0.925rem',
+                  fontSize: '0.95rem',
                   fontWeight: 700,
                   textDecoration: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  minHeight: '46px',
+                  minHeight: '48px',
                 }}
               >
                 <MessageSquare size={18} />
